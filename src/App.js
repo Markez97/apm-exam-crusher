@@ -324,7 +324,7 @@ function CompletionScreen({ xp, score, onContinue }) {
         <p style={{ color: C.muted, fontSize: 12, margin: "0 0 6px" }}>XP EARNED</p>
         <p style={{ color: C.accent, fontSize: 40, fontWeight: 900, margin: 0 }}>+{xp}</p>
       </div>
-      <button onClick={onContinue} style={{ padding: "16px 40px", borderRadius: 99, border: "none", background: `linear-gradient(135deg,${C.accent},${C.accentDark})`, color: "#000", cursor: "pointer", fontWeight: 800, fontSize: 16, boxShadow: `0 8px 32px ${C.accentGlow}` }}>
+      <button onClick={() => onContinue(xp)} style={{ padding: "16px 40px", borderRadius: 99, border: "none", background: `linear-gradient(135deg,${C.accent},${C.accentDark})`, color: "#000", cursor: "pointer", fontWeight: 800, fontSize: 16, boxShadow: `0 8px 32px ${C.accentGlow}` }}>
         Keep Crushing →
       </button>
     </div>
@@ -338,7 +338,7 @@ function FlashcardLesson({ lesson, topic, onComplete }) {
   const [done, setDone] = useState(false);
   const cards = lesson.cards;
   const next = () => { setFlipped(false); setTimeout(() => { if (idx + 1 >= cards.length) setDone(true); else setIdx(idx + 1); }, 200); };
-  if (done) return <CompletionScreen xp={lesson.xpReward} onContinue={onComplete} />;
+  if (done) return <CompletionScreen xp={lesson.xpReward} onContinue={() => onComplete(lesson.xpReward)} />;
   const card = cards[idx];
   return (
     <div style={{ padding: "20px 16px", display: "flex", flexDirection: "column", minHeight: "78vh" }}>
@@ -371,7 +371,8 @@ function MCQLesson({ lesson, topic, onComplete }) {
   const q = questions[idx];
   const choose = (i) => { if (selected !== null) return; setSelected(i); if (i === q.answer) setCorrect(c => c + 1); };
   const next = () => { setSelected(null); if (idx + 1 >= questions.length) setDone(true); else setIdx(idx + 1); };
-  if (done) return <CompletionScreen xp={Math.round((correct / questions.length) * lesson.xpReward)} score={`${correct}/${questions.length}`} onContinue={onComplete} />;
+  const earnedXP = Math.round((correct / questions.length) * lesson.xpReward);
+  if (done) return <CompletionScreen xp={earnedXP} score={`${correct}/${questions.length}`} onContinue={() => onComplete(earnedXP)} />;
   return (
     <div style={{ padding: "20px 16px", minHeight: "78vh", display: "flex", flexDirection: "column" }}>
       <ProgressBar current={idx} total={questions.length} color={topic.color} />
@@ -409,7 +410,7 @@ function FormulaLesson({ lesson, topic, onComplete }) {
   const [done, setDone] = useState(false);
   const formulas = lesson.formulas;
   const next = () => { setRevealed(false); setTimeout(() => { if (idx + 1 >= formulas.length) setDone(true); else setIdx(idx + 1); }, 200); };
-  if (done) return <CompletionScreen xp={lesson.xpReward} onContinue={onComplete} />;
+  if (done) return <CompletionScreen xp={lesson.xpReward} onContinue={() => onComplete(lesson.xpReward)} />;
   const f = formulas[idx];
   return (
     <div style={{ padding: "20px 16px", minHeight: "78vh", display: "flex", flexDirection: "column" }}>
@@ -478,7 +479,7 @@ function ScenarioLesson({ lesson, topic, onComplete }) {
       {!submitted ? (
         <button onClick={() => setSubmitted(true)} disabled={selected.length === 0} style={{ width: "100%", padding: "15px", borderRadius: 14, border: "none", background: selected.length ? `linear-gradient(135deg,${C.accent},${C.accentDark})` : C.border, color: selected.length ? "#000" : C.muted, cursor: selected.length ? "pointer" : "not-allowed", fontWeight: 700, fontSize: 15, marginTop: "auto" }}>Submit Answer</button>
       ) : (
-        <button onClick={onComplete} style={{ width: "100%", padding: "15px", borderRadius: 14, border: "none", background: `linear-gradient(135deg,${C.accent},${C.accentDark})`, color: "#000", cursor: "pointer", fontWeight: 700, fontSize: 15 }}>Continue →</button>
+        <button onClick={() => onComplete(lesson.xpReward)} style={{ width: "100%", padding: "15px", borderRadius: 14, border: "none", background: `linear-gradient(135deg,${C.accent},${C.accentDark})`, color: "#000", cursor: "pointer", fontWeight: 700, fontSize: 15 }}>Continue →</button>
       )}
     </div>
   );
@@ -491,7 +492,7 @@ function ExamTipsLesson({ lesson, topic, onComplete }) {
   const [done, setDone] = useState(false);
   const tips = lesson.tips;
   const next = () => { setExpanded(false); setTimeout(() => { if (idx + 1 >= tips.length) setDone(true); else setIdx(idx + 1); }, 200); };
-  if (done) return <CompletionScreen xp={lesson.xpReward} onContinue={onComplete} />;
+  if (done) return <CompletionScreen xp={lesson.xpReward} onContinue={() => onComplete(lesson.xpReward)} />;
   const t = tips[idx];
   return (
     <div style={{ padding: "20px 16px", minHeight: "78vh", display: "flex", flexDirection: "column" }}>
@@ -801,33 +802,41 @@ export default function App() {
   const handleLessonComplete = useCallback((xpEarned) => {
     if (!selectedTopic || !selectedLesson) return;
     const key = `${selectedTopic.id}-${selectedLesson.id}`;
+    const xpToAward = xpEarned || selectedLesson.xpReward || 30;
     setProgress(prev => {
       const alreadyDone = !!prev.completedLessons[key];
-      const xpGain = alreadyDone ? 0 : xpEarned;
+      const xpGain = alreadyDone ? 0 : xpToAward;
       const today = todayStr();
       const newDates = [...new Set([...prev.studyDates, today])];
       const newStreak = computeStreak(newDates);
       return {
         ...prev,
         totalXP: prev.totalXP + xpGain,
-        gems: prev.gems + (alreadyDone ? 0 : Math.floor(xpEarned / 5)),
-        completedLessons: { ...prev.completedLessons, [key]: { xp: xpEarned, completedAt: new Date().toISOString() } },
+        gems: prev.gems + (alreadyDone ? 0 : Math.floor(xpToAward / 5)),
+        completedLessons: { ...prev.completedLessons, [key]: { xp: xpToAward, completedAt: new Date().toISOString() } },
         studyDates: newDates,
         streak: newStreak,
         lastStudiedDate: today,
       };
     });
+    // Navigate back to topic screen
     setSelectedLesson(null);
   }, [selectedTopic, selectedLesson]);
 
   const renderLesson = () => {
-    if (!selectedLesson) return null;
-    const props = { lesson: selectedLesson, topic: selectedTopic, onComplete: (xp) => handleLessonComplete(xp || selectedLesson.xpReward) };
+    if (!selectedLesson || !selectedTopic) return null;
+    const lessonXP = selectedLesson.xpReward || 30;
+    const props = {
+      lesson: selectedLesson,
+      topic: selectedTopic,
+      onComplete: (xp) => handleLessonComplete(xp !== undefined ? xp : lessonXP),
+    };
     if (selectedLesson.type === "flashcard") return <FlashcardLesson {...props} />;
     if (selectedLesson.type === "mcq") return <MCQLesson {...props} />;
     if (selectedLesson.type === "formula") return <FormulaLesson {...props} />;
     if (selectedLesson.type === "scenario") return <ScenarioLesson {...props} />;
     if (selectedLesson.type === "examtips") return <ExamTipsLesson {...props} />;
+    return null;
   };
 
   const navItems = [

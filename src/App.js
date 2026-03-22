@@ -678,7 +678,7 @@ function HomeScreen({ onSelectTopic, progress }) {
 // ── AI Chat ────────────────────────────────────────────────────────────────────
 function ChatScreen({ currentTopic }) {
   const [messages, setMessages] = useState([
-    { role: "assistant", content: `Hey! 👊 I'm your APM AI Tutor — let's crush this exam together.\n\nAsk me anything about APM:\n• Explain concepts & frameworks\n• Work through formulas step by step\n• Practice scenario questions\n• Examiner tips & marking schemes\n\n${currentTopic ? `You're studying **${currentTopic.title}**. What do you need?` : "Which topic shall we tackle?"}` }
+    { role: "assistant", content: `Hey! 👊 Let's crush APM together — powered by Claude.ai for free!\n\nHow it works:\n1️⃣ Type your APM question below\n2️⃣ Tap ➤ and Claude opens instantly\n3️⃣ Your question arrives pre-filled with APM context\n4️⃣ Get a full expert answer — completely free!\n\n${currentTopic ? `You're studying **${currentTopic.title}**. What do you need?` : "Which topic shall we tackle?"}` }
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -696,31 +696,21 @@ function ChatScreen({ currentTopic }) {
   }[currentTopic.id] || ["Ask me anything about APM"])
   : ["Explain EVA vs RI", "What is the Balanced Scorecard?", "How do I approach APM Section A?"];
 
-  const sendMessage = async (text) => {
+  const openInClaude = (text) => {
     const userText = text || input.trim();
-    if (!userText || loading) return;
+    if (!userText) return;
     setInput("");
-    const newMessages = [...messages, { role: "user", content: userText }];
-    setMessages(newMessages);
-    setLoading(true);
-    try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          system: `You are an expert ACCA APM tutor inside APM Exam Crusher — a focused exam prep app. ONLY answer APM-related questions. Be direct and exam-focused. Use **bold** for key terms. Keep answers under 280 words. Use 🎯 for key points, 📐 for formulas, ⚠️ for warnings, ✅ for correct approaches.${currentTopic ? ` Student is studying: ${currentTopic.title}` : ""}`,
-          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
-        }),
-      });
-      const data = await response.json();
-      const reply = data.content?.find(b => b.type === "text")?.text || "Sorry, couldn't get a response. Try again.";
-      setMessages(prev => [...prev, { role: "assistant", content: reply }]);
-    } catch {
-      setMessages(prev => [...prev, { role: "assistant", content: "⚠️ Connection error. Please check your internet." }]);
-    }
-    setLoading(false);
+    const topicContext = currentTopic
+      ? `I am studying ACCA APM (Advanced Performance Management), specifically the topic "${currentTopic.title}". `
+      : `I am studying ACCA APM (Advanced Performance Management). `;
+    const fullPrompt = `${topicContext}Please help me with the following:\n\n${userText}`;
+    const claudeUrl = `https://claude.ai/new?q=${encodeURIComponent(fullPrompt)}`;
+    window.open(claudeUrl, "_blank");
+    setMessages(prev => [
+      ...prev,
+      { role: "user", content: userText },
+      { role: "assistant", content: `✅ Opened Claude with your question!\n\nClaude will answer it with full APM context. Switch to the Claude tab that just opened to see your answer. 🎓` }
+    ]);
   };
 
   const renderMessage = (text) => text.split('\n').map((line, i) => {
@@ -737,7 +727,7 @@ function ChatScreen({ currentTopic }) {
             <h2 style={{ color: C.white, fontSize: 17, fontWeight: 800, margin: 0 }}>APM AI Tutor</h2>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
               <div style={{ width: 7, height: 7, borderRadius: "50%", background: C.accent, boxShadow: `0 0 6px ${C.accent}` }} />
-              <span style={{ color: C.accent, fontSize: 11, fontWeight: 600 }}>Online · Exam Specialist</span>
+              <span style={{ color: C.accent, fontSize: 11, fontWeight: 600 }}>Powered by Claude.ai · Free</span>
             </div>
           </div>
           {currentTopic && <Badge label={currentTopic.short} color={currentTopic.color} />}
@@ -752,19 +742,12 @@ function ChatScreen({ currentTopic }) {
             </div>
           </div>
         ))}
-        {loading && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 10, background: `linear-gradient(135deg,${C.accent},${C.accentDark})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14 }}>🤖</div>
-            <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: "18px 18px 18px 4px", padding: "14px 18px", display: "flex", gap: 5 }}>
-              {[0, 1, 2].map(i => <div key={i} style={{ width: 7, height: 7, borderRadius: "50%", background: C.accent, animation: "pulse .8s infinite", animationDelay: `${i * .15}s` }} />)}
-            </div>
-          </div>
-        )}
+
         {messages.length === 1 && (
           <div style={{ marginTop: 8 }}>
             <p style={{ color: C.muted, fontSize: 11, letterSpacing: 2, textTransform: "uppercase", marginBottom: 10 }}>Quick Questions</p>
             {suggested.map(q => (
-              <button key={q} onClick={() => sendMessage(q)} style={{ width: "100%", background: C.card, border: `1px solid ${C.accent}33`, borderRadius: 12, padding: "10px 14px", cursor: "pointer", color: C.accent, fontSize: 13, textAlign: "left", fontWeight: 600, marginBottom: 8, transition: "all .2s" }}
+              <button key={q} onClick={() => openInClaude(q)} style={{ width: "100%", background: C.card, border: `1px solid ${C.accent}33`, borderRadius: 12, padding: "10px 14px", cursor: "pointer", color: C.accent, fontSize: 13, textAlign: "left", fontWeight: 600, marginBottom: 8, transition: "all .2s" }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.background = C.accent + "11"; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = C.accent + "33"; e.currentTarget.style.background = C.card; }}>
                 💬 {q}
@@ -777,13 +760,13 @@ function ChatScreen({ currentTopic }) {
       <div style={{ padding: "12px 16px 20px", background: C.bg, borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
         <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
           <div style={{ flex: 1, background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: "10px 14px" }}>
-            <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); } }} placeholder="Ask anything about APM..." rows={1} style={{ flex: 1, background: "none", border: "none", outline: "none", color: C.text, fontSize: 14, resize: "none", fontFamily: "inherit", lineHeight: 1.5, width: "100%" }} />
+            <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); openInClaude(); } }} placeholder="Type your APM question, then tap ➤ to open Claude..." rows={1} style={{ flex: 1, background: "none", border: "none", outline: "none", color: C.text, fontSize: 14, resize: "none", fontFamily: "inherit", lineHeight: 1.5, width: "100%" }} />
           </div>
-          <button onClick={() => sendMessage()} disabled={!input.trim() || loading} style={{ width: 46, height: 46, borderRadius: 14, border: "none", background: input.trim() && !loading ? `linear-gradient(135deg,${C.accent},${C.accentDark})` : "#0D2020", cursor: input.trim() && !loading ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0, boxShadow: input.trim() && !loading ? `0 0 12px ${C.accentGlow}` : "none" }}>
-            {loading ? "⏳" : "➤"}
+          <button onClick={() => openInClaude()} disabled={!input.trim()} style={{ width: 46, height: 46, borderRadius: 14, border: "none", background: input.trim() ? `linear-gradient(135deg,${C.accent},${C.accentDark})` : "#0D2020", cursor: input.trim() ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0, boxShadow: input.trim() ? `0 0 12px ${C.accentGlow}` : "none" }}>
+            "➤"
           </button>
         </div>
-        <p style={{ color: C.muted, fontSize: 10, textAlign: "center", marginTop: 8 }}>APM Exam Crusher AI · Always verify with official ACCA materials</p>
+        <p style={{ color: C.muted, fontSize: 10, textAlign: "center", marginTop: 8 }}>Opens Claude.ai with your question pre-filled · 100% Free 🎓</p>
       </div>
       <style>{`@keyframes pulse{0%,80%,100%{opacity:.3;transform:scale(1)}40%{opacity:1;transform:scale(1.3)}}`}</style>
     </div>

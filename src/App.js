@@ -902,7 +902,7 @@ export default function App() {
         </div>
       )}
 
-      <div style={{ overflowY: tab === "chat" ? "hidden" : "auto", height: tab === "chat" ? "100vh" : "auto", paddingBottom: tab === "chat" ? 0 : 72 }}>
+      <div style={{ overflowY: tab === "chat" ? "hidden" : "auto", height: tab === "chat" ? "calc(100vh - 64px)" : "auto", paddingBottom: tab === "chat" ? 0 : 72 }}>
         {tab === "home" && <HomeScreen onSelectTopic={setSelectedTopic} progress={progress} />}
         {tab === "chat" && <ChatScreen currentTopic={selectedTopic} />}
         {tab === "leaderboard" && (
@@ -933,7 +933,7 @@ export default function App() {
         )}
       </div>
 
-      {tab !== "chat" && (
+      {(
         <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: "#050C0C", borderTop: `1px solid ${C.border}`, display: "flex", padding: "8px 0 12px", zIndex: 40 }}>
           {navItems.map(item => (
             <button key={item.id} onClick={() => { setTab(item.id); setSelectedTopic(null); setSelectedLesson(null); }} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "6px 0" }}>
@@ -946,7 +946,7 @@ export default function App() {
       )}
 
       {tab !== "chat" && (
-        <button onClick={() => setTab("chat")} style={{ position: "fixed", bottom: 82, right: 16, width: 52, height: 52, borderRadius: 16, border: "none", background: `linear-gradient(135deg,${C.accent},${C.accentDark})`, cursor: "pointer", fontSize: 22, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 20px ${C.accentGlow}`, zIndex: 39 }}>
+        <button onClick={() => setTab("chat")}  style={{ position: "fixed", bottom: 82, right: 16, width: 52, height: 52, borderRadius: 16, border: "none", background: `linear-gradient(135deg,${C.accent},${C.accentDark})`, cursor: "pointer", fontSize: 22, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 20px ${C.accentGlow}`, zIndex: 39 }}>
           🤖
         </button>
       )}

@@ -678,12 +678,13 @@ function HomeScreen({ onSelectTopic, progress }) {
 // ── AI Chat ────────────────────────────────────────────────────────────────────
 function ChatScreen({ currentTopic }) {
   const [messages, setMessages] = useState([
-    { role: "assistant", content: `Hey! 👊 Let's crush APM together — powered by Claude.ai for free!\n\nHow it works:\n1️⃣ Type your APM question below\n2️⃣ Tap ➤ and Claude opens instantly\n3️⃣ Your question arrives pre-filled with APM context\n4️⃣ Get a full expert answer — completely free!\n\n${currentTopic ? `You're studying **${currentTopic.title}**. What do you need?` : "Which topic shall we tackle?"}` }
+    { role: "assistant", content: `Hey! 👊 Let\'s crush APM together!\n\nType your question below and choose which free AI to open it in. Your question will arrive pre-filled with APM context — no account setup needed!\n\n${currentTopic ? `You\'re studying **${currentTopic.title}**. What do you need help with?` : "What APM topic do you need help with?"}` }
   ]);
   const [input, setInput] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [showAIChoice, setShowAIChoice] = useState(false);
+  const [pendingQuestion, setPendingQuestion] = useState("");
   const bottomRef = useRef(null);
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, loading]);
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
   const suggested = currentTopic ? ({
     spc: ["Explain the Balanced Scorecard with an example", "Difference between CSF and KPI?", "Weaknesses of the BSC?"],
@@ -696,30 +697,73 @@ function ChatScreen({ currentTopic }) {
   }[currentTopic.id] || ["Ask me anything about APM"])
   : ["Explain EVA vs RI", "What is the Balanced Scorecard?", "How do I approach APM Section A?"];
 
-  const openInClaude = (text) => {
+  const handleSend = (text) => {
     const userText = text || input.trim();
     if (!userText) return;
+    setPendingQuestion(userText);
+    setShowAIChoice(true);
+  };
+
+  const openInAI = (aiChoice) => {
+    setShowAIChoice(false);
     setInput("");
     const topicContext = currentTopic
       ? `I am studying ACCA APM (Advanced Performance Management), specifically the topic "${currentTopic.title}". `
       : `I am studying ACCA APM (Advanced Performance Management). `;
-    const fullPrompt = `${topicContext}Please help me with the following:\n\n${userText}`;
-    const claudeUrl = `https://claude.ai/new?q=${encodeURIComponent(fullPrompt)}`;
-    window.open(claudeUrl, "_blank");
+    const fullPrompt = `${topicContext}Please help me with the following:\n\n${pendingQuestion}`;
+    const encoded = encodeURIComponent(fullPrompt);
+    const urls = {
+      claude: `https://claude.ai/new?q=${encoded}`,
+      chatgpt: `https://chatgpt.com/?q=${encoded}`,
+      gemini: `https://gemini.google.com/app?q=${encoded}`,
+    };
+    window.open(urls[aiChoice], "_blank");
+    const names = { claude: "Claude", chatgpt: "ChatGPT", gemini: "Gemini" };
+    const icons = { claude: "🟠", chatgpt: "🟢", gemini: "🔵" };
     setMessages(prev => [
       ...prev,
-      { role: "user", content: userText },
-      { role: "assistant", content: `✅ Opened Claude with your question!\n\nClaude will answer it with full APM context. Switch to the Claude tab that just opened to see your answer. 🎓` }
+      { role: "user", content: pendingQuestion },
+      { role: "assistant", content: `${icons[aiChoice]} Opened **${names[aiChoice]}** with your question!\n\nSwitch to the ${names[aiChoice]} tab that just opened — your question is already there with full APM context. 🎓` }
     ]);
+    setPendingQuestion("");
   };
 
-  const renderMessage = (text) => text.split('\n').map((line, i) => {
+  const renderMessage = (text) => text.split("\n").map((line, i) => {
     const parts = line.split(/\*\*(.*?)\*\*/g);
-    return <span key={i}>{parts.map((p, j) => j % 2 === 1 ? <strong key={j} style={{ color: C.accent }}>{p}</strong> : p)}{i < text.split('\n').length - 1 && <br />}</span>;
+    return <span key={i}>{parts.map((p, j) => j % 2 === 1 ? <strong key={j} style={{ color: C.accent }}>{p}</strong> : p)}{i < text.split("\n").length - 1 && <br />}</span>;
   });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+      {/* AI Choice Modal */}
+      {showAIChoice && (
+        <div style={{ position: "fixed", inset: 0, background: "#000000aa", zIndex: 200, display: "flex", alignItems: "flex-end", justifyContent: "center" }}>
+          <div style={{ background: C.card, borderRadius: "24px 24px 0 0", padding: "24px 20px 40px", width: "100%", maxWidth: 480, border: `1px solid ${C.border}` }}>
+            <div style={{ width: 40, height: 4, borderRadius: 99, background: C.border, margin: "0 auto 20px" }} />
+            <h3 style={{ color: C.white, fontSize: 17, fontWeight: 800, marginBottom: 6, textAlign: "center" }}>Choose your AI</h3>
+            <p style={{ color: C.muted, fontSize: 13, textAlign: "center", marginBottom: 20 }}>All free — pick whichever you have!</p>
+            {[
+              { id: "claude", name: "Claude", desc: "by Anthropic · Best for detailed explanations", icon: "🟠", color: "#FF6B2B" },
+              { id: "chatgpt", name: "ChatGPT", desc: "by OpenAI · Great for step-by-step answers", icon: "🟢", color: "#10A37F" },
+              { id: "gemini", name: "Google Gemini", desc: "by Google · No account needed", icon: "🔵", color: "#4285F4" },
+            ].map(ai => (
+              <button key={ai.id} onClick={() => openInAI(ai.id)} style={{ width: "100%", background: C.bg, border: `1.5px solid ${ai.color}44`, borderRadius: 16, padding: "14px 16px", cursor: "pointer", textAlign: "left", marginBottom: 10, display: "flex", alignItems: "center", gap: 14, transition: "all .2s" }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = ai.color; e.currentTarget.style.background = ai.color + "11"; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = ai.color + "44"; e.currentTarget.style.background = C.bg; }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: ai.color + "22", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24 }}>{ai.icon}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: C.white, fontWeight: 700, fontSize: 15 }}>{ai.name}</div>
+                  <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{ai.desc}</div>
+                </div>
+                <div style={{ color: ai.color, fontSize: 18 }}>→</div>
+              </button>
+            ))}
+            <button onClick={() => setShowAIChoice(false)} style={{ width: "100%", padding: "13px", borderRadius: 14, border: `1px solid ${C.border}`, background: "transparent", color: C.muted, cursor: "pointer", fontSize: 14, marginTop: 4 }}>Cancel</button>
+          </div>
+        </div>
+      )}
+
+      {/* Header */}
       <div style={{ background: `linear-gradient(135deg,${C.accent}12,#080F0F)`, padding: "20px 16px 16px", borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{ width: 44, height: 44, borderRadius: 14, background: `linear-gradient(135deg,${C.accent},${C.accentDark})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 22, boxShadow: `0 0 16px ${C.accentGlow}` }}>🤖</div>
@@ -727,12 +771,14 @@ function ChatScreen({ currentTopic }) {
             <h2 style={{ color: C.white, fontSize: 17, fontWeight: 800, margin: 0 }}>APM AI Tutor</h2>
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 3 }}>
               <div style={{ width: 7, height: 7, borderRadius: "50%", background: C.accent, boxShadow: `0 0 6px ${C.accent}` }} />
-              <span style={{ color: C.accent, fontSize: 11, fontWeight: 600 }}>Powered by Claude.ai · Free</span>
+              <span style={{ color: C.accent, fontSize: 11, fontWeight: 600 }}>Claude · ChatGPT · Gemini · Free</span>
             </div>
           </div>
           {currentTopic && <Badge label={currentTopic.short} color={currentTopic.color} />}
         </div>
       </div>
+
+      {/* Messages */}
       <div style={{ flex: 1, overflowY: "auto", padding: "16px", display: "flex", flexDirection: "column", gap: 12 }}>
         {messages.map((msg, i) => (
           <div key={i} style={{ display: "flex", justifyContent: msg.role === "user" ? "flex-end" : "flex-start" }}>
@@ -742,12 +788,11 @@ function ChatScreen({ currentTopic }) {
             </div>
           </div>
         ))}
-
         {messages.length === 1 && (
           <div style={{ marginTop: 8 }}>
             <p style={{ color: C.muted, fontSize: 11, letterSpacing: 2, textTransform: "uppercase", marginBottom: 10 }}>Quick Questions</p>
             {suggested.map(q => (
-              <button key={q} onClick={() => openInClaude(q)} style={{ width: "100%", background: C.card, border: `1px solid ${C.accent}33`, borderRadius: 12, padding: "10px 14px", cursor: "pointer", color: C.accent, fontSize: 13, textAlign: "left", fontWeight: 600, marginBottom: 8, transition: "all .2s" }}
+              <button key={q} onClick={() => handleSend(q)} style={{ width: "100%", background: C.card, border: `1px solid ${C.accent}33`, borderRadius: 12, padding: "10px 14px", cursor: "pointer", color: C.accent, fontSize: 13, textAlign: "left", fontWeight: 600, marginBottom: 8, transition: "all .2s" }}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.background = C.accent + "11"; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = C.accent + "33"; e.currentTarget.style.background = C.card; }}>
                 💬 {q}
@@ -757,18 +802,19 @@ function ChatScreen({ currentTopic }) {
         )}
         <div ref={bottomRef} />
       </div>
+
+      {/* Input */}
       <div style={{ padding: "12px 16px 20px", background: C.bg, borderTop: `1px solid ${C.border}`, flexShrink: 0 }}>
         <div style={{ display: "flex", gap: 10, alignItems: "flex-end" }}>
           <div style={{ flex: 1, background: C.card, border: `1px solid ${C.border}`, borderRadius: 16, padding: "10px 14px" }}>
-            <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); openInClaude(); } }} placeholder="Type your APM question, then tap ➤ to open Claude..." rows={1} style={{ flex: 1, background: "none", border: "none", outline: "none", color: C.text, fontSize: 14, resize: "none", fontFamily: "inherit", lineHeight: 1.5, width: "100%" }} />
+            <textarea value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); } }} placeholder="Type your APM question here..." rows={1} style={{ flex: 1, background: "none", border: "none", outline: "none", color: C.text, fontSize: 14, resize: "none", fontFamily: "inherit", lineHeight: 1.5, width: "100%" }} />
           </div>
-          <button onClick={() => openInClaude()} disabled={!input.trim()} style={{ width: 46, height: 46, borderRadius: 14, border: "none", background: input.trim() ? `linear-gradient(135deg,${C.accent},${C.accentDark})` : "#0D2020", cursor: input.trim() ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0, boxShadow: input.trim() ? `0 0 12px ${C.accentGlow}` : "none" }}>
-            "➤"
+          <button onClick={() => handleSend()} disabled={!input.trim()} style={{ width: 46, height: 46, borderRadius: 14, border: "none", background: input.trim() ? `linear-gradient(135deg,${C.accent},${C.accentDark})` : "#0D2020", cursor: input.trim() ? "pointer" : "not-allowed", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0, boxShadow: input.trim() ? `0 0 12px ${C.accentGlow}` : "none" }}>
+            ➤
           </button>
         </div>
-        <p style={{ color: C.muted, fontSize: 10, textAlign: "center", marginTop: 8 }}>Opens Claude.ai with your question pre-filled · 100% Free 🎓</p>
+        <p style={{ color: C.muted, fontSize: 10, textAlign: "center", marginTop: 8 }}>Opens Claude, ChatGPT or Gemini with your question · 100% Free 🎓</p>
       </div>
-      <style>{`@keyframes pulse{0%,80%,100%{opacity:.3;transform:scale(1)}40%{opacity:1;transform:scale(1.3)}}`}</style>
     </div>
   );
 }

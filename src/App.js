@@ -934,31 +934,29 @@ export default function App() {
   const [selectedTopic, setSelectedTopic] = useState(null);
   const [selectedLesson, setSelectedLesson] = useState(null);
 
+  // Save progress whenever it changes
   useEffect(() => { saveProgress(progress); }, [progress]);
 
-  // Sync leaderboard whenever XP or streak changes
+  // Sync leaderboard when XP or streak changes
   useEffect(() => {
     if (progress.username) {
       saveToLeaderboard(progress.username, progress.totalXP, progress.streak);
     }
   }, [progress.totalXP, progress.streak, progress.username]);
 
-  const handleOnboardingComplete = useCallback((username) => {
-    const newProgress = { ...progress, username };
-    setProgress(newProgress);
+  // Called when user submits their name on onboarding
+  const handleOnboardingComplete = (username) => {
+    const newProgress = {
+      username,
+      totalXP: 0, gems: 0, streak: 0,
+      lastStudiedDate: null,
+      completedLessons: {},
+      studyDates: [],
+    };
     saveProgress(newProgress);
     saveToLeaderboard(username, 0, 0);
-  }, [progress]);
-
-  // Show onboarding if no username yet
-  if (!progress.username) {
-    return (
-      <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", maxWidth: 480, margin: "0 auto" }}>
-        <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@800;900&family=Inter:wght@400;600;700;800&display=swap'); *{box-sizing:border-box;margin:0;padding:0;} body{background:#080F0F;} input{font-family:'Inter',sans-serif;} button{font-family:'Inter',sans-serif;}`}</style>
-        <OnboardingScreen onComplete={handleOnboardingComplete} />
-      </div>
-    );
-  }
+    setProgress(newProgress);
+  };
 
   const handleLessonComplete = useCallback((xpEarned) => {
     if (!selectedTopic || !selectedLesson) return;
@@ -980,7 +978,6 @@ export default function App() {
         lastStudiedDate: today,
       };
     });
-    // Navigate back to topic screen
     setSelectedLesson(null);
   }, [selectedTopic, selectedLesson]);
 
@@ -1006,19 +1003,34 @@ export default function App() {
     { id: "leaderboard", icon: "🏆", label: "Ranks" },
   ];
 
+  const styles = `
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@800;900&family=Inter:wght@400;600;700;800&display=swap');
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:#080F0F;}
+    button{font-family:'Inter',sans-serif;}
+    input{font-family:'Inter',sans-serif;}
+    ::-webkit-scrollbar{width:4px;}
+    ::-webkit-scrollbar-track{background:transparent;}
+    ::-webkit-scrollbar-thumb{background:#143030;border-radius:4px;}
+    textarea::placeholder{color:#546E7A;}
+  `;
+
+  // ── Show onboarding if no username ─────────────────────────────────────────
+  if (!progress.username) {
+    return (
+      <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", maxWidth: 480, margin: "0 auto" }}>
+        <style>{styles}</style>
+        <OnboardingScreen onComplete={handleOnboardingComplete} />
+      </div>
+    );
+  }
+
+  // ── Main app ───────────────────────────────────────────────────────────────
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: "'Inter',-apple-system,sans-serif", maxWidth: 480, margin: "0 auto", position: "relative" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@800;900&family=Inter:wght@400;600;700;800&display=swap');
-        *{box-sizing:border-box;margin:0;padding:0;}
-        body{background:#080F0F;}
-        button{font-family:'Inter',sans-serif;}
-        ::-webkit-scrollbar{width:4px;}
-        ::-webkit-scrollbar-track{background:transparent;}
-        ::-webkit-scrollbar-thumb{background:#143030;border-radius:4px;}
-        textarea::placeholder{color:#546E7A;}
-      `}</style>
+      <style>{styles}</style>
 
+      {/* Lesson overlay */}
       {selectedLesson && (
         <div style={{ position: "fixed", inset: 0, background: C.bg, zIndex: 100, overflowY: "auto", maxWidth: 480, margin: "0 auto" }}>
           <div style={{ padding: "16px 16px 0", borderBottom: `1px solid ${C.border}`, background: C.bg }}>
@@ -1028,25 +1040,24 @@ export default function App() {
         </div>
       )}
 
+      {/* Topic overlay */}
       {selectedTopic && !selectedLesson && (
         <div style={{ position: "fixed", inset: 0, background: C.bg, zIndex: 50, overflowY: "auto", maxWidth: 480, margin: "0 auto" }}>
           <TopicScreen topic={selectedTopic} onSelectLesson={setSelectedLesson} onBack={() => setSelectedTopic(null)} completedLessons={progress.completedLessons} />
         </div>
       )}
 
+      {/* Main content */}
       <div style={{ overflowY: tab === "chat" ? "hidden" : "auto", height: tab === "chat" ? "calc(100vh - 64px)" : "auto", paddingBottom: tab === "chat" ? 0 : 72 }}>
         {tab === "home" && <HomeScreen onSelectTopic={setSelectedTopic} progress={progress} />}
         {tab === "chat" && <ChatScreen currentTopic={selectedTopic} />}
         {tab === "leaderboard" && (() => {
-          const lb = loadLeaderboard()
-            .sort((a, b) => b.totalXP - a.totalXP)
-            .slice(0, 20);
+          const lb = loadLeaderboard().sort((a, b) => b.totalXP - a.totalXP).slice(0, 20);
           const medals = ["🥇","🥈","🥉"];
-          const myRank = lb.findIndex(e => e.username === progress.username);
           return (
             <div style={{ padding: "24px 16px 80px" }}>
               <h2 style={{ color: C.accent, fontSize: 22, fontWeight: 900, marginBottom: 4, fontFamily: "'Playfair Display',serif" }}>APM Rankings</h2>
-              <p style={{ color: C.muted, fontSize: 13, marginBottom: 24 }}>Real APM Exam Crushers on this device</p>
+              <p style={{ color: C.muted, fontSize: 13, marginBottom: 24 }}>Real APM Exam Crushers</p>
               {lb.length === 0 && (
                 <div style={{ textAlign: "center", padding: "40px 20px", color: C.muted }}>
                   <div style={{ fontSize: 40, marginBottom: 12 }}>🏆</div>
@@ -1058,13 +1069,11 @@ export default function App() {
                 return (
                   <div key={p.username} style={{ background: isMe ? C.accent + "12" : C.card, border: `1px solid ${isMe ? C.accent + "66" : C.border}`, borderRadius: 16, padding: "14px 16px", marginBottom: 10, display: "flex", alignItems: "center", gap: 14, boxShadow: isMe ? `0 0 16px ${C.accentGlow}` : "none" }}>
                     <div style={{ width: 32, textAlign: "center", fontSize: 20 }}>{medals[i] || `#${i+1}`}</div>
-                    <div style={{ width: 40, height: 40, borderRadius: 12, background: isMe ? C.accent + "22" : C.border, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, color: isMe ? C.accent : C.muted }}>
+                    <div style={{ width: 40, height: 40, borderRadius: 12, background: isMe ? C.accent + "22" : C.border, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, fontWeight: 800, color: isMe ? C.accent : C.muted }}>
                       {p.username.slice(0,2).toUpperCase()}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <div style={{ color: isMe ? C.accent : C.white, fontWeight: 700, fontSize: 14 }}>
-                        {p.username} {isMe ? "(You)" : ""}
-                      </div>
+                      <div style={{ color: isMe ? C.accent : C.white, fontWeight: 700, fontSize: 14 }}>{p.username}{isMe ? " (You)" : ""}</div>
                       <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{p.totalXP.toLocaleString()} XP</div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
@@ -1074,30 +1083,25 @@ export default function App() {
                   </div>
                 );
               })}
-              {myRank === -1 && (
-                <div style={{ background: C.accent + "12", border: `1px solid ${C.accent}44`, borderRadius: 16, padding: "14px 16px", marginTop: 8, textAlign: "center" }}>
-                  <p style={{ color: C.accent, fontSize: 13, fontWeight: 700, margin: 0 }}>Complete lessons to appear on the leaderboard! 💪</p>
-                </div>
-              )}
             </div>
           );
         })()}
       </div>
 
-      {(
-        <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: "#050C0C", borderTop: `1px solid ${C.border}`, display: "flex", padding: "8px 0 12px", zIndex: 40 }}>
-          {navItems.map(item => (
-            <button key={item.id} onClick={() => { setTab(item.id); setSelectedTopic(null); setSelectedLesson(null); }} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "6px 0" }}>
-              <span style={{ fontSize: 22 }}>{item.icon}</span>
-              <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: .5, color: tab === item.id ? C.accent : C.muted }}>{item.label}</span>
-              {tab === item.id && <div style={{ width: 16, height: 3, borderRadius: 99, background: C.accent, boxShadow: `0 0 8px ${C.accent}` }} />}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Bottom Nav — always visible */}
+      <div style={{ position: "fixed", bottom: 0, left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 480, background: "#050C0C", borderTop: `1px solid ${C.border}`, display: "flex", padding: "8px 0 12px", zIndex: 40 }}>
+        {navItems.map(item => (
+          <button key={item.id} onClick={() => { setTab(item.id); setSelectedTopic(null); setSelectedLesson(null); }} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "6px 0" }}>
+            <span style={{ fontSize: 22 }}>{item.icon}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: .5, color: tab === item.id ? C.accent : C.muted }}>{item.label}</span>
+            {tab === item.id && <div style={{ width: 16, height: 3, borderRadius: 99, background: C.accent, boxShadow: `0 0 8px ${C.accent}` }} />}
+          </button>
+        ))}
+      </div>
 
+      {/* Floating AI button */}
       {tab !== "chat" && (
-        <button onClick={() => setTab("chat")}  style={{ position: "fixed", bottom: 82, right: 16, width: 52, height: 52, borderRadius: 16, border: "none", background: `linear-gradient(135deg,${C.accent},${C.accentDark})`, cursor: "pointer", fontSize: 22, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 20px ${C.accentGlow}`, zIndex: 39 }}>
+        <button onClick={() => setTab("chat")} style={{ position: "fixed", bottom: 82, right: 16, width: 52, height: 52, borderRadius: 16, border: "none", background: `linear-gradient(135deg,${C.accent},${C.accentDark})`, cursor: "pointer", fontSize: 22, display: "flex", alignItems: "center", justifyContent: "center", boxShadow: `0 4px 20px ${C.accentGlow}`, zIndex: 39 }}>
           🤖
         </button>
       )}

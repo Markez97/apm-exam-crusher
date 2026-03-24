@@ -9,11 +9,39 @@ function loadProgress() {
     if (raw) return JSON.parse(raw);
   } catch {}
   return {
+    username: null,
     totalXP: 0, gems: 0, streak: 0,
     lastStudiedDate: null,
     completedLessons: {},
     studyDates: [],
   };
+}
+
+// Shared leaderboard stored under a separate key
+const LB_KEY = "apm_leaderboard_v1";
+
+function loadLeaderboard() {
+  try {
+    const raw = localStorage.getItem(LB_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return [];
+}
+
+function saveToLeaderboard(username, totalXP, streak) {
+  try {
+    const lb = loadLeaderboard();
+    const existing = lb.findIndex(e => e.username === username);
+    const entry = { username, totalXP, streak, updatedAt: new Date().toISOString() };
+    if (existing >= 0) lb[existing] = entry;
+    else lb.push(entry);
+    localStorage.setItem(LB_KEY, JSON.stringify(lb));
+  } catch {}
+}
+
+function isUsernameTaken(username) {
+  const lb = loadLeaderboard();
+  return lb.some(e => e.username.toLowerCase() === username.toLowerCase());
 }
 
 function saveProgress(data) {
@@ -573,8 +601,89 @@ function TopicScreen({ topic, onSelectLesson, onBack, completedLessons }) {
   );
 }
 
+
+// ── Onboarding Screen ──────────────────────────────────────────────────────────
+function OnboardingScreen({ onComplete }) {
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = () => {
+    const trimmed = name.trim();
+    if (!trimmed) { setError("Please enter a name!"); return; }
+    if (trimmed.length < 2) { setError("Name must be at least 2 characters."); return; }
+    if (trimmed.length > 20) { setError("Name must be under 20 characters."); return; }
+    if (!/^[a-zA-Z0-9_ ]+$/.test(trimmed)) { setError("Only letters, numbers, spaces and underscores allowed."); return; }
+    if (isUsernameTaken(trimmed)) { setError("That name is already taken! Try another."); return; }
+    setLoading(true);
+    setTimeout(() => {
+      saveToLeaderboard(trimmed, 0, 0);
+      onComplete(trimmed);
+    }, 600);
+  };
+
+  return (
+    <div style={{ minHeight: "100vh", background: C.bg, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "32px 24px" }}>
+      {/* Glow */}
+      <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translateX(-50%)", width: 300, height: 300, borderRadius: "50%", background: C.accentGlow, filter: "blur(80px)", pointerEvents: "none" }} />
+
+      <div style={{ position: "relative", width: "100%", maxWidth: 400, textAlign: "center" }}>
+        {/* Logo */}
+        <div style={{ fontSize: 64, marginBottom: 16 }}>💪</div>
+        <h1 style={{ color: C.accent, fontSize: 28, fontWeight: 900, margin: "0 0 8px", fontFamily: "'Playfair Display',serif", textShadow: `0 0 20px ${C.accent}66` }}>APM Exam Crusher</h1>
+        <p style={{ color: C.muted, fontSize: 14, marginBottom: 40, lineHeight: 1.6 }}>The smart way to prepare for your ACCA APM exam. Choose a name to get started!</p>
+
+        {/* Name input */}
+        <div style={{ background: C.card, border: `1.5px solid ${error ? C.red : name.trim() ? C.accent : C.border}`, borderRadius: 16, padding: "14px 18px", marginBottom: 12, transition: "border-color .2s", boxShadow: name.trim() ? `0 0 16px ${C.accentGlow}` : "none" }}>
+          <input
+            value={name}
+            onChange={e => { setName(e.target.value); setError(""); }}
+            onKeyDown={e => e.key === "Enter" && handleSubmit()}
+            placeholder="Enter your name or nickname..."
+            maxLength={20}
+            style={{ width: "100%", background: "none", border: "none", outline: "none", color: C.white, fontSize: 16, fontFamily: "inherit", fontWeight: 600 }}
+            autoFocus
+          />
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div style={{ background: C.red + "18", border: `1px solid ${C.red}44`, borderRadius: 10, padding: "10px 14px", marginBottom: 16 }}>
+            <p style={{ color: C.red, fontSize: 13, margin: 0 }}>⚠️ {error}</p>
+          </div>
+        )}
+
+        {/* Rules */}
+        <p style={{ color: C.muted, fontSize: 11, marginBottom: 24, lineHeight: 1.6 }}>
+          Your name appears on the leaderboard.<br/>Names must be unique across all users.
+        </p>
+
+        {/* Submit */}
+        <button onClick={handleSubmit} disabled={!name.trim() || loading} style={{ width: "100%", padding: "16px", borderRadius: 16, border: "none", background: name.trim() && !loading ? `linear-gradient(135deg,${C.accent},${C.accentDark})` : "#0D2020", color: name.trim() && !loading ? "#000" : C.muted, cursor: name.trim() && !loading ? "pointer" : "not-allowed", fontWeight: 800, fontSize: 16, transition: "all .2s", boxShadow: name.trim() ? `0 8px 24px ${C.accentGlow}` : "none" }}>
+          {loading ? "Setting up your profile..." : "Start Crushing 💪"}
+        </button>
+
+        {/* Features */}
+        <div style={{ display: "flex", gap: 10, marginTop: 32 }}>
+          {[
+            { icon: "🔥", label: "Daily Streaks" },
+            { icon: "🏆", label: "Leaderboard" },
+            { icon: "🤖", label: "AI Tutor" },
+          ].map(f => (
+            <div key={f.label} style={{ flex: 1, background: C.card, borderRadius: 12, padding: "12px 8px", textAlign: "center", border: `1px solid ${C.border}` }}>
+              <div style={{ fontSize: 22, marginBottom: 4 }}>{f.icon}</div>
+              <div style={{ color: C.muted, fontSize: 10, fontWeight: 600 }}>{f.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Home Screen ────────────────────────────────────────────────────────────────
 function HomeScreen({ onSelectTopic, progress }) {
+  const username = progress.username || 'Student';
   const { totalXP, gems, streak, completedLessons, studyDates } = progress;
   const totalLessons = Object.values(LESSONS).flat().length;
   const completedCount = Object.keys(completedLessons).length;
@@ -596,6 +705,7 @@ function HomeScreen({ onSelectTopic, progress }) {
                 <div>
                   <h1 style={{ color: C.accent, fontSize: 22, fontWeight: 900, margin: 0, fontFamily: "'Playfair Display',serif", textShadow: `0 0 20px ${C.accent}66` }}>APM Exam Crusher</h1>
                   <p style={{ color: C.accentDark, fontSize: 11, fontWeight: 700, letterSpacing: 2, margin: 0, textTransform: "uppercase" }}>Advanced Performance Management</p>
+                  <p style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>Hey, <span style={{color: C.accent, fontWeight: 700}}>{username}</span> 👋</p>
                 </div>
               </div>
             </div>
@@ -828,6 +938,23 @@ export default function App() {
 
   useEffect(() => { saveProgress(progress); }, [progress]);
 
+  // Sync leaderboard whenever XP or streak changes
+  useEffect(() => {
+    if (progress.username) {
+      saveToLeaderboard(progress.username, progress.totalXP, progress.streak);
+    }
+  }, [progress.totalXP, progress.streak, progress.username]);
+
+  // Show onboarding if no username yet
+  if (!progress.username) {
+    return (
+      <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", maxWidth: 480, margin: "0 auto" }}>
+        <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@800;900&family=Inter:wght@400;600;700;800&display=swap'); *{box-sizing:border-box;margin:0;padding:0;} body{background:#080F0F;} input{font-family:'Inter',sans-serif;} button{font-family:'Inter',sans-serif;}`}</style>
+        <OnboardingScreen onComplete={(username) => setProgress(prev => ({ ...prev, username }))} />
+      </div>
+    );
+  }
+
   const handleLessonComplete = useCallback((xpEarned) => {
     if (!selectedTopic || !selectedLesson) return;
     const key = `${selectedTopic.id}-${selectedLesson.id}`;
@@ -905,32 +1032,51 @@ export default function App() {
       <div style={{ overflowY: tab === "chat" ? "hidden" : "auto", height: tab === "chat" ? "calc(100vh - 64px)" : "auto", paddingBottom: tab === "chat" ? 0 : 72 }}>
         {tab === "home" && <HomeScreen onSelectTopic={setSelectedTopic} progress={progress} />}
         {tab === "chat" && <ChatScreen currentTopic={selectedTopic} />}
-        {tab === "leaderboard" && (
-          <div style={{ padding: "24px 16px 80px" }}>
-            <h2 style={{ color: C.accent, fontSize: 22, fontWeight: 900, marginBottom: 4, fontFamily: "'Playfair Display',serif" }}>APM Rankings</h2>
-            <p style={{ color: C.muted, fontSize: 13, marginBottom: 24 }}>Top APM Exam Crushers this week</p>
-            {[
-              { name: "Sarah M.", xp: 3840, streak: 42, flag: "🇬🇧" },
-              { name: "Ahmed K.", xp: 3210, streak: 35, flag: "🇵🇰" },
-              { name: "Priya S.", xp: 2980, streak: 28, flag: "🇮🇳" },
-              { name: "You", xp: progress.totalXP, streak: progress.streak, flag: "⭐", isMe: true },
-              { name: "Liu W.", xp: 420, streak: 5, flag: "🇨🇳" },
-            ].sort((a, b) => b.xp - a.xp).map((p, i) => (
-              <div key={p.name} style={{ background: p.isMe ? C.accent + "12" : C.card, border: `1px solid ${p.isMe ? C.accent + "66" : C.border}`, borderRadius: 16, padding: "14px 16px", marginBottom: 10, display: "flex", alignItems: "center", gap: 14, boxShadow: p.isMe ? `0 0 16px ${C.accentGlow}` : "none" }}>
-                <div style={{ width: 32, textAlign: "center", fontSize: 20 }}>{["🥇","🥈","🥉"][i] || `#${i+1}`}</div>
-                <div style={{ width: 40, height: 40, borderRadius: 12, background: p.isMe ? C.accent + "22" : C.border, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20 }}>{p.flag}</div>
-                <div style={{ flex: 1 }}>
-                  <div style={{ color: p.isMe ? C.accent : C.white, fontWeight: 700, fontSize: 14 }}>{p.name}</div>
-                  <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{p.xp.toLocaleString()} XP</div>
+        {tab === "leaderboard" && (() => {
+          const lb = loadLeaderboard()
+            .sort((a, b) => b.totalXP - a.totalXP)
+            .slice(0, 20);
+          const medals = ["🥇","🥈","🥉"];
+          const myRank = lb.findIndex(e => e.username === progress.username);
+          return (
+            <div style={{ padding: "24px 16px 80px" }}>
+              <h2 style={{ color: C.accent, fontSize: 22, fontWeight: 900, marginBottom: 4, fontFamily: "'Playfair Display',serif" }}>APM Rankings</h2>
+              <p style={{ color: C.muted, fontSize: 13, marginBottom: 24 }}>Real APM Exam Crushers on this device</p>
+              {lb.length === 0 && (
+                <div style={{ textAlign: "center", padding: "40px 20px", color: C.muted }}>
+                  <div style={{ fontSize: 40, marginBottom: 12 }}>🏆</div>
+                  <p>No other players yet — share the app!</p>
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <span style={{ fontSize: 16 }}>🔥</span>
-                  <span style={{ fontWeight: 800, fontSize: 14, color: C.gold }}>{p.streak}</span>
+              )}
+              {lb.map((p, i) => {
+                const isMe = p.username === progress.username;
+                return (
+                  <div key={p.username} style={{ background: isMe ? C.accent + "12" : C.card, border: `1px solid ${isMe ? C.accent + "66" : C.border}`, borderRadius: 16, padding: "14px 16px", marginBottom: 10, display: "flex", alignItems: "center", gap: 14, boxShadow: isMe ? `0 0 16px ${C.accentGlow}` : "none" }}>
+                    <div style={{ width: 32, textAlign: "center", fontSize: 20 }}>{medals[i] || `#${i+1}`}</div>
+                    <div style={{ width: 40, height: 40, borderRadius: 12, background: isMe ? C.accent + "22" : C.border, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontWeight: 800, color: isMe ? C.accent : C.muted }}>
+                      {p.username.slice(0,2).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: isMe ? C.accent : C.white, fontWeight: 700, fontSize: 14 }}>
+                        {p.username} {isMe ? "(You)" : ""}
+                      </div>
+                      <div style={{ color: C.muted, fontSize: 12, marginTop: 2 }}>{p.totalXP.toLocaleString()} XP</div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                      <span style={{ fontSize: 16 }}>🔥</span>
+                      <span style={{ fontWeight: 800, fontSize: 14, color: C.gold }}>{p.streak}</span>
+                    </div>
+                  </div>
+                );
+              })}
+              {myRank === -1 && (
+                <div style={{ background: C.accent + "12", border: `1px solid ${C.accent}44`, borderRadius: 16, padding: "14px 16px", marginTop: 8, textAlign: "center" }}>
+                  <p style={{ color: C.accent, fontSize: 13, fontWeight: 700, margin: 0 }}>Complete lessons to appear on the leaderboard! 💪</p>
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+              )}
+            </div>
+          );
+        })()}
       </div>
 
       {(

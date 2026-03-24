@@ -616,10 +616,8 @@ function OnboardingScreen({ onComplete }) {
     if (!/^[a-zA-Z0-9_ ]+$/.test(trimmed)) { setError("Only letters, numbers, spaces and underscores allowed."); return; }
     if (isUsernameTaken(trimmed)) { setError("That name is already taken! Try another."); return; }
     setLoading(true);
-    setTimeout(() => {
-      saveToLeaderboard(trimmed, 0, 0);
-      onComplete(trimmed);
-    }, 600);
+    // Directly call onComplete — no setTimeout to avoid race conditions
+    onComplete(trimmed);
   };
 
   return (
@@ -945,12 +943,19 @@ export default function App() {
     }
   }, [progress.totalXP, progress.streak, progress.username]);
 
+  const handleOnboardingComplete = useCallback((username) => {
+    const newProgress = { ...progress, username };
+    setProgress(newProgress);
+    saveProgress(newProgress);
+    saveToLeaderboard(username, 0, 0);
+  }, [progress]);
+
   // Show onboarding if no username yet
   if (!progress.username) {
     return (
       <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", maxWidth: 480, margin: "0 auto" }}>
         <style>{`@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@800;900&family=Inter:wght@400;600;700;800&display=swap'); *{box-sizing:border-box;margin:0;padding:0;} body{background:#080F0F;} input{font-family:'Inter',sans-serif;} button{font-family:'Inter',sans-serif;}`}</style>
-        <OnboardingScreen onComplete={(username) => setProgress(prev => ({ ...prev, username }))} />
+        <OnboardingScreen onComplete={handleOnboardingComplete} />
       </div>
     );
   }
